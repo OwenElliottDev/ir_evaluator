@@ -1,7 +1,10 @@
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::fmt;
+use std::str::FromStr;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
+#[derive(EnumIter, Debug)]
 pub enum IRMetric {
     NDCG,
     DCG,
@@ -9,7 +12,13 @@ pub enum IRMetric {
     Precision,
     Recall,
     RR,
-    Rel
+    Rel,
+}
+
+impl IRMetric {
+    pub fn all_metrics() -> Vec<IRMetric> {
+        IRMetric::iter().collect()
+    }
 }
 
 impl fmt::Display for IRMetric {
@@ -43,7 +52,7 @@ impl FromStr for IRMetric {
     }
 }
 
-trait Metric {
+pub trait Metric {
     fn calculate(
         &self,
         retrieved: &Vec<u32>,
@@ -288,7 +297,6 @@ mod tests {
         relevant.insert(4, 1.0);
         let ks = vec![1, 2, 3, 4];
         let precision_at_ks = precision_at_ks(&retrieved, &relevant, &ks);
-        println!("{:?}", precision_at_ks);
         let expected_precision_at_ks = vec![1.0, 0.5, 0.6666666, 0.75];
         for (precision, expected_precision) in
             precision_at_ks.iter().zip(expected_precision_at_ks.iter())

@@ -1,1 +1,4 @@
 /target
+*.tsv
+*.py
+results.json
