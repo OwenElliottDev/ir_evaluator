@@ -1,9 +1,9 @@
-pub mod aggregates;
+mod aggregates;
 mod evaluator;
-pub mod metrics;
-pub mod qrels;
+mod metrics;
+mod qrels;
 
+pub use aggregates::{aggregate_results, AggregatedIREvalResults};
+pub use evaluator::{evaluate, IREvalMetadata, IREvalResults};
 pub use metrics::IRMetric;
 pub use qrels::IREvalDataset;
-// pub use aggregates::{AggregateMetrics, aggregate_results};
-pub use evaluator::{evaluate, IREvalMetadata, IREvalResults};

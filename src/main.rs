@@ -1,3 +1,4 @@
+use ir_eval_rust::aggregate_results;
 use ir_eval_rust::evaluate;
 use ir_eval_rust::IREvalDataset;
 use ir_eval_rust::IRMetric;
@@ -83,6 +84,18 @@ fn main() {
     println!(
         "Output writing completed in {:?}",
         output_write_start_time.elapsed()
+    );
+
+    let aggregate_results_start_time = Instant::now();
+    let aggregated_results = aggregate_results(ir_eval_results, None);
+    let output_file_path = "aggregated_results.json";
+    aggregated_results
+        .write_to_json_file(output_file_path, true)
+        .unwrap();
+
+    println!(
+        "Aggregated results completed in {:?}",
+        aggregate_results_start_time.elapsed()
     );
 
     let process_end_time = process_start_time.elapsed();

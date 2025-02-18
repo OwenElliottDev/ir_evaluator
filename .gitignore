@@ -2,3 +2,4 @@
 *.tsv
 *.py
 results.json
+aggregated_results.json
