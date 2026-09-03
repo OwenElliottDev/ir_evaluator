@@ -14,9 +14,10 @@ pub struct AggregatedIREvalResults {
 
 impl AggregatedIREvalResults {
     pub fn write_to_json_file(&self, file_path: &str, pretty: bool) -> Result<(), std::io::Error> {
-        let json_str = match pretty {
-            true => serde_json::to_string_pretty(self),
-            false => serde_json::to_string(self),
+        let json_str = if pretty {
+            serde_json::to_string_pretty(self)
+        } else {
+            serde_json::to_string(self)
         }?;
         std::fs::write(file_path, json_str)
     }
@@ -65,9 +66,9 @@ fn compute_aggregations(
                     metric_values.iter().sum::<f32>() / metric_values.len() as f32
                 }
                 AggregationType::Median => {
-                    metric_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    metric_values.sort_by(|a, b| a.total_cmp(b));
                     let mid = metric_values.len() / 2;
-                    if metric_values.len() % 2 == 0 {
+                    if metric_values.len().is_multiple_of(2) {
                         (metric_values[mid - 1] + metric_values[mid]) / 2.0
                     } else {
                         metric_values[mid]
@@ -75,11 +76,11 @@ fn compute_aggregations(
                 }
                 AggregationType::Max => *metric_values
                     .iter()
-                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .max_by(|a, b| a.total_cmp(b))
                     .unwrap(),
                 AggregationType::Min => *metric_values
                     .iter()
-                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .min_by(|a, b| a.total_cmp(b))
                     .unwrap(),
                 AggregationType::Sum => metric_values.iter().sum(),
             };
@@ -96,22 +97,17 @@ pub fn aggregate_results(
     results: IREvalResults,
     aggregations: Option<Vec<AggregationType>>,
 ) -> AggregatedIREvalResults {
-    let aggregations = match aggregations {
-        Some(aggregations) => aggregations,
-        None => vec![AggregationType::Mean],
-    };
+    let aggregations = aggregations.unwrap_or_else(|| vec![AggregationType::Mean]);
 
     let query_results = results.query_results;
 
     let aggregate_results = compute_aggregations(query_results, aggregations);
 
-    let aggregate_ir_eval_results = AggregatedIREvalResults {
+    AggregatedIREvalResults {
         metrics: results.metrics.clone(),
-        aggregate_results: aggregate_results,
+        aggregate_results,
         metadata: results.metadata,
-    };
-
-    aggregate_ir_eval_results
+    }
 }
 
 #[cfg(test)]
@@ -156,7 +152,7 @@ mod tests {
 
         let ir_eval_results = IREvalResults {
             metrics: vec!["metric1".to_string(), "metric2".to_string()],
-            query_results: query_results,
+            query_results,
             metadata: IREvalMetadata {
                 start_time: 0,
                 end_time: 0,

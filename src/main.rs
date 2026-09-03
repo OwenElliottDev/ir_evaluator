@@ -24,15 +24,9 @@ fn parse_args() -> Result<IRArgs, &'static str> {
 
     let ground_truth_qrels_path = args[1].clone();
     let retrieved_qrels_path = args[2].clone();
-    let ks: Option<Vec<u32>> = match args.get(3) {
-        Some(ks) => Some(ks.split(",").map(|k| k.parse().unwrap()).collect()),
-        None => None,
-    };
+    let ks: Option<Vec<u32>> = args.get(3).map(|ks| ks.split(",").map(|k| k.parse().unwrap()).collect());
 
-    let metrics: Option<Vec<IRMetric>> = match args.get(4) {
-        Some(metrics) => Some(metrics.split(",").map(|m| m.parse().unwrap()).collect()),
-        None => None,
-    };
+    let metrics: Option<Vec<IRMetric>> = args.get(4).map(|metrics| metrics.split(",").map(|m| m.parse().unwrap()).collect());
 
     Ok(IRArgs {
         ground_truth_qrels_path,
