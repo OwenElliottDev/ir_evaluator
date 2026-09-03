@@ -1,7 +1,5 @@
-use core::panic;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -27,9 +25,10 @@ impl IREvalResults {
     }
 
     pub fn write_to_json_file(&self, file_path: &str, pretty: bool) -> Result<(), std::io::Error> {
-        let json_str = match pretty {
-            true => self.serialize_to_pretty_json(),
-            false => self.serialize_to_json(),
+        let json_str = if pretty {
+            self.serialize_to_pretty_json()
+        } else {
+            self.serialize_to_json()
         }?;
         std::fs::write(file_path, json_str)
     }

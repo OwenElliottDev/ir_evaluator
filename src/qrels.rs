@@ -17,7 +17,7 @@ impl Ord for ScoredDoc {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.score
             .partial_cmp(&other.score)
-            .unwrap_or_else(|| Ordering::Less)
+            .unwrap_or(Ordering::Less)
             .reverse()
     }
 }
@@ -35,6 +35,12 @@ pub struct IREvalDataset {
     pub retrieved_qrels: HashMap<String, Vec<ScoredDoc>>,
     docid_to_int: HashMap<String, u32>,
     pub doc_count: u32,
+}
+
+impl Default for IREvalDataset {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IREvalDataset {
@@ -96,124 +102,72 @@ impl IREvalDataset {
         }
     }
 
+    /// Return the internal integer id for `docid`, assigning a fresh one on first sight.
+    fn intern_docid(&mut self, docid: &str) -> u32 {
+        if let Some(&docid_int) = self.docid_to_int.get(docid) {
+            return docid_int;
+        }
+        self.doc_count += 1;
+        self.docid_to_int.insert(docid.to_string(), self.doc_count);
+        self.doc_count
+    }
+
     pub fn add_ground_truth_qrel(&mut self, qid: String, docid: String, rel: f32) {
-        let docid_int = match self.docid_to_int.get(&docid) {
-            Some(&docid_int) => docid_int,
-            None => {
-                self.doc_count += 1;
-                self.docid_to_int.insert(docid.clone(), self.doc_count);
-                self.doc_count
-            }
-        };
-
-        let query_rels = self
-            .ground_truth_qrels
-            .entry(qid.clone())
-            .or_insert_with(|| HashMap::new());
-
-        query_rels.insert(docid_int, rel);
+        let docid_int = self.intern_docid(&docid);
+        self.ground_truth_qrels
+            .entry(qid)
+            .or_default()
+            .insert(docid_int, rel);
     }
 
     pub fn add_retrieved_qrel(&mut self, qid: String, docid: String, rel: f32) {
-        let docid_int: u32 = match self.docid_to_int.get(&docid) {
-            Some(&docid_int) => docid_int,
-            None => {
-                self.doc_count += 1;
-                self.docid_to_int.insert(docid.clone(), self.doc_count);
-                self.doc_count
-            }
-        };
+        let docid_int = self.intern_docid(&docid);
+        let scored_docs = self.retrieved_qrels.entry(qid).or_default();
 
-        let scored_docs = self
-            .retrieved_qrels
-            .entry(qid.clone())
-            .or_insert_with(|| Vec::new());
-
-        // scored_docs.push(ScoredDoc {
-        //     docid: docid_int,
-        //     score: rel,
-        // });
         let new_doc = ScoredDoc {
             docid: docid_int,
             score: rel,
         };
-        match scored_docs.binary_search(&new_doc) {
-            Ok(_) => {}
-            Err(pos) => scored_docs.insert(pos, new_doc),
-        };
+        if let Err(pos) = scored_docs.binary_search(&new_doc) {
+            scored_docs.insert(pos, new_doc);
+        }
     }
 
     pub fn add_ground_truth_qrels(&mut self, qid: String, qrels: HashMap<String, f32>) {
-        let mut scored_docs = HashMap::new();
-        for (docid, rel) in qrels {
-            let docid_int = match self.docid_to_int.get(&docid) {
-                Some(&docid_int) => docid_int,
-                None => {
-                    self.doc_count += 1;
-                    self.docid_to_int.insert(docid.clone(), self.doc_count);
-                    self.doc_count
-                }
-            };
-            scored_docs.insert(docid_int, rel);
-        }
-
-        self.ground_truth_qrels.insert(qid.clone(), scored_docs);
+        let scored_docs = qrels
+            .into_iter()
+            .map(|(docid, rel)| (self.intern_docid(&docid), rel))
+            .collect();
+        self.ground_truth_qrels.insert(qid, scored_docs);
     }
 
     pub fn add_retrieved_qrels(&mut self, qid: String, qrels: HashMap<String, f32>) {
-        let mut scored_docs = Vec::new();
-        for (docid, rel) in qrels {
-            let docid_int = match self.docid_to_int.get(&docid) {
-                Some(&docid_int) => docid_int,
-                None => {
-                    self.doc_count += 1;
-                    self.docid_to_int.insert(docid.clone(), self.doc_count);
-                    self.doc_count
-                }
-            };
-            scored_docs.push(ScoredDoc {
-                docid: docid_int,
+        let mut scored_docs: Vec<ScoredDoc> = qrels
+            .into_iter()
+            .map(|(docid, rel)| ScoredDoc {
+                docid: self.intern_docid(&docid),
                 score: rel,
-            });
-        }
-
+            })
+            .collect();
         scored_docs.sort();
-
-        self.retrieved_qrels.insert(qid.clone(), scored_docs);
+        self.retrieved_qrels.insert(qid, scored_docs);
     }
 
     pub fn get_ground_truth_qrels(&self, qid: &str) -> Option<&HashMap<u32, f32>> {
-        match self.ground_truth_qrels.get(qid) {
-            Some(qrels) => Some(qrels),
-            None => None,
-        }
+        self.ground_truth_qrels.get(qid)
     }
 
     pub fn get_retrieved_qrels(&self, qid: &str) -> Option<&Vec<ScoredDoc>> {
-        match self.retrieved_qrels.get(qid) {
-            Some(qrels) => Some(qrels),
-            None => None,
-        }
+        self.retrieved_qrels.get(qid)
     }
 
     pub fn get_internal_docid(&self, docid: &str) -> Option<u32> {
-        match self.docid_to_int.get(docid) {
-            Some(&docid_int) => Some(docid_int),
-            None => None,
-        }
+        self.docid_to_int.get(docid).copied()
     }
 
     pub fn get_ground_truth_relevance(&self, qid: &str, docid: &str) -> Option<f32> {
-        match self.ground_truth_qrels.get(qid) {
-            Some(qrels) => match self.docid_to_int.get(docid) {
-                Some(&docid_int) => match qrels.get(&docid_int) {
-                    Some(&rel) => Some(rel),
-                    None => None,
-                },
-                None => None,
-            },
-            None => None,
-        }
+        let docid_int = self.docid_to_int.get(docid)?;
+        self.ground_truth_qrels.get(qid)?.get(docid_int).copied()
     }
 }
 
